@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoastMath - honest coffee roasting math</title>
+<style>
+  :root { --bg:#171210; --card:#231a14; --line:#41301f; --ink:#efe6da; --dim:#b09a83; --amber:#d08c42; --warn:#e07a4a; --ok:#94b862; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:920px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:30px; margin:6px 0 0; } h1 span { color:var(--amber); }
+  nav { text-align:right; } nav a { color:var(--dim); text-decoration:none; font-size:14px; }
+  nav a:hover { color:var(--amber); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-top:22px; }
+  .card h2 { margin:0 0 14px; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
+  input, select { background:#191310; border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 10px; font-size:15px; width:120px; }
+  select { width:auto; min-width:150px; }
+  .presets { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .presets button { background:#2c2016; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:14px; cursor:pointer; }
+  .presets button:hover { border-color:var(--amber); }
+  .stat { display:inline-block; background:#191310; border:1px solid var(--line); border-radius:10px; padding:12px 18px; margin:0 10px 10px 0; min-width:130px; }
+  .stat b { display:block; font-size:24px; color:var(--amber); }
+  .stat small { color:var(--dim); font-size:12px; }
+  .verdict { font-size:17px; margin:2px 0 14px; }
+  .verdict b { color:var(--amber); }
+  .fix { background:#2c1e12; border:1px solid #4f3a20; border-radius:10px; padding:12px 16px; margin-top:8px; font-size:15px; }
+  .fix.ok { background:#1e2415; border-color:#3d4d28; }
+  .note { color:var(--dim); font-size:13px; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; font-size:15px; }
+  td, th { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="index.html">about</a></nav>
+  <h1>Roast<span>Math</span></h1>
+  <div class="note" style="font-size:14px;">Beans lose weight, scoops lie, and the crack starts the clock. All of it is arithmetic.</div>
+
+  <div class="card">
+    <h2>The batch</h2>
+    <div class="row">
+      <div><label>Roast level</label><select id="level"><option value="light">Light</option><option value="medium" selected>Medium</option><option value="dark">Dark</option></select></div>
+      <div><label>Roasted coffee wanted (g)</label><input id="want" type="number" min="50" step="50" value="250"></div>
+      <div><label>Green price ($/kg)</label><input id="price" type="number" min="1" step="0.5" value="9"></div>
+      <div><label>Brew dose (g)</label><input id="dose" type="number" min="5" step="1" value="15"></div>
+    </div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="card">
+    <h2>The yield</h2>
+    <div id="yield"></div>
+  </div>
+
+  <div class="card">
+    <h2>The roast clock</h2>
+    <div class="row">
+      <div><label>First crack at (min:sec)</label><input id="fc" type="text" value="8:00" style="width:90px"></div>
+      <div><label>Target development ratio</label><select id="dtr"><option value="0.18">18% - bright</option><option value="0.20" selected>20% - balanced</option><option value="0.24">24% - sweet</option></select></div>
+    </div>
+    <div id="clock"></div>
+  </div>
+
+  <div class="card">
+    <h2>The honest truths</h2>
+    <div class="row">
+      <div><label>Brew method</label><select id="method"><option value="filter" selected>Filter / pour-over</option><option value="espresso">Espresso</option></select></div>
+      <div><label>Days since roast</label><input id="days" type="number" min="0" max="90" step="1" value="7"></div>
+    </div>
+    <div id="truths"></div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+var $ = function(id){ return document.getElementById(id); };
+var PRESETS = {
+  'First roast, 100g light': { level:'light', want:100, price:9, dose:15 },
+  'Weekly 500g filter': { level:'medium', want:500, price:8.5, dose:16 },
+  'Espresso 1kg dark': { level:'dark', want:1000, price:9, dose:18 },
+  'Gift bags, 750g': { level:'medium', want:750, price:10, dose:15 }
+};
+var pb = $('presets');
+Object.keys(PRESETS).forEach(function(name){
+  var b = document.createElement('button'); b.textContent = name;
+  b.onclick = function(){ var p = PRESETS[name];
+    $('level').value = p.level; $('want').value = p.want; $('price').value = p.price; $('dose').value = p.dose; render(); };
+  pb.appendChild(b);
+});
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function mmss(sec){ return Math.floor(sec/60) + ':' + ('0' + (sec%60)).slice(-2); }
+
+function render(){
+  var level = $('level').value;
+  var want = parseFloat($('want').value), price = parseFloat($('price').value), dose = parseFloat($('dose').value);
+  if (!(want > 0)) { $('yield').innerHTML = '<div class="note">Enter a roasted weight.</div>'; $('clock').innerHTML=''; $('truths').innerHTML=''; return; }
+  var green = RoastEngine.greenForYield(want, level);
+  var loss = RoastEngine.lossPct(level);
+  var cost = RoastEngine.costPerRoastedKg(price, level);
+  var cups = RoastEngine.cupsFromBag(want, dose);
+
+  $('yield').innerHTML =
+    '<div class="verdict">For <b>' + want + 'g roasted ' + level + '</b>, buy <b>' + green + 'g of green</b> - you lose <b>' + loss + '%</b> to moisture and chaff, and that is not negotiable.</div>' +
+    '<span class="stat"><b>' + green + 'g</b><small>green to buy</small></span>' +
+    '<span class="stat"><b>' + loss + '%</b><small>weight loss, ' + level + '</small></span>' +
+    '<span class="stat"><b>$' + cost.toFixed(2) + '</b><small>real cost per roasted kg</small></span>' +
+    '<span class="stat"><b>' + cups + '</b><small>cups at ' + dose + 'g dose</small></span>' +
+    '<div class="note">Green at $' + price + '/kg becomes $' + cost.toFixed(2) + '/kg roasted - the shrinkage tax everyone forgets. Dark roast loses more, so dark costs more per cup than the green price tag says.</div>';
+
+  var m = /^(\d+):([0-5]\d)$/.exec(($('fc').value || '').trim());
+  if (m) {
+    var fcSec = parseInt(m[1]) * 60 + parseInt(m[2]);
+    var dtr = parseFloat($('dtr').value);
+    var t = RoastEngine.devTiming(fcSec, dtr);
+    var pct = Math.round(dtr * 100);
+    $('clock').innerHTML =
+      '<div class="verdict">First crack at <b>' + mmss(fcSec) + '</b>? Drop at <b>' + mmss(t.dropSec) + '</b> - that is <b>' + mmss(t.devSec) + '</b> of development for a <b>' + pct + '%</b> ratio.</div>' +
+      '<span class="stat"><b>' + mmss(t.devSec) + '</b><small>development time</small></span>' +
+      '<span class="stat"><b>' + mmss(t.dropSec) + '</b><small>drop the batch</small></span>' +
+      '<div class="fix ok">' + esc(RoastEngine.devVerdict(pct)) + '</div>' +
+      '<div class="note">Development ratio = time after first crack / total roast time. Under 15% tastes grassy, over 30% tastes baked. The crack starts the clock, not the charge.</div>';
+  } else {
+    $('clock').innerHTML = '<div class="note">Enter first-crack time as min:sec (e.g. 8:00).</div>';
+  }
+
+  var method = $('method').value;
+  var days = parseInt($('days').value);
+  var rest = RoastEngine.restDays(level, method);
+  var peak = RoastEngine.peakWindow();
+  var fv = RoastEngine.freshnessVerdict(days);
+  var fresh = days >= 4 && days <= 14;
+  $('truths').innerHTML =
+    '<div class="verdict">Day <b>' + days + '</b>: <b>' + esc(fv) + '</b></div>' +
+    '<span class="stat"><b>' + rest.min + '-' + rest.max + 'd</b><small>rest before ' + method + '</small></span>' +
+    '<span class="stat"><b>' + peak.start + '-' + peak.end + 'd</b><small>peak window</small></span>' +
+    '<span class="stat"><b>' + RoastEngine.scoopGrams(level) + 'g</b><small>per tablespoon scoop, ' + level + '</small></span>' +
+    '<span class="stat"><b>' + RoastEngine.scoopCaffeine(level) + 'mg</b><small>caffeine per scoop</small></span>' +
+    '<div class="fix' + (fresh ? ' ok' : '') + '">Caffeine truth: per gram, light and dark are the same (' + RoastEngine.MG_PER_GRAM + ' mg/g). But dark beans are less dense, so a scoop of dark (' + RoastEngine.scoopGrams('dark') + 'g, ' + RoastEngine.scoopCaffeine('dark') + 'mg) has less caffeine than a scoop of light (' + RoastEngine.scoopGrams('light') + 'g, ' + RoastEngine.scoopCaffeine('light') + 'mg). Weigh your dose and the myth dies.</div>' +
+    '<div class="note">Rest note: ' + (method === 'espresso' ? 'espresso needs more degassing or the shots gush and taste sharp' : 'filter opens up sooner, but even filter is muted before day ' + rest.min) + '. Peak is days ' + peak.start + '-' + peak.end + '; after day 30 it is fading, and past 45 it is compost.</div>';
+}
+['level','want','price','dose','fc','dtr','method','days'].forEach(function(id){ $(id).addEventListener('input', render); });
+render();
+</script>
+</body>
+</html>
